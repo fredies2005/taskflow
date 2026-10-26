@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="TaskFlow: tareas, calendario y recordatorios con diseño de cristal">
+  <meta name="theme-color" content="#f4f1e8">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="TaskFlow">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&display=swap">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <title>TaskFlow · Tareas, calendario y recordatorios</title>
+  <script>
+    /* Aplica el tema antes de pintar para evitar parpadeos */
+    try {
+      var s = (JSON.parse(localStorage.getItem("taskflow.v2")) || {}).settings || {};
+      var dark = s.theme === "dark" || (s.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+      document.documentElement.dataset.theme = dark ? "dark" : "light";
+      if (s.accent) document.documentElement.dataset.accent = s.accent;
+    } catch (e) {
+      if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark";
+    }
+  </script>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Fondo: manchas de color mate + grano -->
+  <div class="bg" aria-hidden="true">
+    <i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i>
+  </div>
+
+  <div class="app">
+
+    <!-- ===== Barra lateral ===== -->
+    <aside class="sidebar glass" aria-label="Navegación principal">
+      <a href="#" class="logo" aria-label="TaskFlow, inicio" data-action="go-home">
+        <img class="logo__img logo__img--light" src="logo-light.png" alt="TaskFlow" width="640" height="209">
+        <img class="logo__img logo__img--dark" src="logo-dark.png" alt="" aria-hidden="true" width="640" height="209">
+      </a>
+
+      <div class="nav-wrap" id="nav-wrap">
+        <span class="nav-pill" id="nav-pill" aria-hidden="true"></span>
+        <nav class="nav" id="nav" aria-label="Vistas"></nav>
+        <div class="nav-section">
+          <span>Mis proyectos</span>
+          <button type="button" class="icon-btn icon-btn--sm" id="add-cat" aria-label="Nuevo proyecto" title="Nuevo proyecto"></button>
+        </div>
+        <nav class="nav nav--cats" id="nav-cats" aria-label="Proyectos"></nav>
+        <div class="nav-section">
+          <span>Grupos</span>
+          <button type="button" class="icon-btn icon-btn--sm" id="add-group" aria-label="Crear o unirse a un grupo" title="Crear o unirse a un grupo"></button>
+        </div>
+        <nav class="nav nav--cats" id="nav-groups" aria-label="Grupos"></nav>
+      </div>
+
+      <div class="sidebar__foot">
+        <div class="tip">
+          <p><kbd>N</kbd> nueva tarea</p>
+          <p><kbd>/</kbd> buscar</p>
+          <p><kbd>⌘</kbd><kbd>K</kbd> comandos</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===== Contenido principal ===== -->
+    <main class="main" id="main">
+
+      <header class="topbar glass">
+        <label class="search" role="search">
+          <span class="sr-only">Buscar tareas</span>
+          <span class="search__ic" data-icon="search"></span>
+          <input type="search" id="search" placeholder="Buscar en todas tus tareas…" autocomplete="off">
+          <kbd class="search__kbd">/</kbd>
+        </label>
+        <div class="topbar__actions">
+          <button type="button" class="icon-btn" id="btn-ai" aria-label="Asistente de IA" title="Asistente de IA" data-icon="sparkle"></button>
+          <button type="button" class="icon-btn" id="btn-conn" aria-label="Conexiones" title="Conexiones y cuentas" data-icon="plug"></button>
+          <button type="button" class="icon-btn" id="btn-palette" aria-label="Paleta de comandos" title="Comandos (⌘K)" data-icon="command"></button>
+          <button type="button" class="icon-btn" id="btn-bell" aria-haspopup="true" aria-expanded="false" aria-label="Recordatorios" title="Recordatorios">
+            <span data-icon="bell"></span><span class="badge" id="bell-badge" hidden>0</span>
+          </button>
+          <button type="button" class="icon-btn" id="btn-theme" aria-label="Cambiar tema" title="Cambiar tema"></button>
+          <button type="button" class="icon-btn" id="btn-settings" aria-haspopup="true" aria-expanded="false" aria-label="Ajustes" title="Ajustes" data-icon="sliders"></button>
+        </div>
+      </header>
+
+      <nav class="dock glass" id="dock" aria-label="Conectores y asistentes"></nav>
+
+      <section class="page-head">
+        <div>
+          <p class="eyebrow" id="eyebrow"></p>
+          <h1 id="view-title">Hoy</h1>
+        </div>
+        <button type="button" class="btn btn--primary btn--lg" data-action="new-task">
+          <span data-icon="plus"></span> Nueva tarea
+        </button>
+      </section>
+
+      <div id="hero-area"></div>
+
+      <section id="group-area" aria-label="Grupo"></section>
+
+      <form class="quick glass" id="quick-form" autocomplete="off">
+        <span class="quick__ic" data-icon="plus"></span>
+        <input type="text" id="quick-input" maxlength="140" aria-label="Añadir tarea rápida"
+               placeholder="Añade algo rápido… “Llamar al médico mañana 10:30 !alta #salud”">
+        <button type="submit" class="btn btn--primary btn--sm">Añadir</button>
+        <div class="quick__preview" id="quick-preview" aria-live="polite"></div>
+      </form>
+
+      <div class="filters" id="filters"></div>
+
+      <div id="list-area"></div>
+      <div id="calendar-area" hidden></div>
+    </main>
+
+    <!-- ===== Panel derecho ===== -->
+    <aside class="rail" aria-label="Herramientas">
+
+      <section class="widget glass spot" id="timer" aria-label="Temporizador de enfoque">
+        <header class="widget__head">
+          <h3>Enfoque</h3>
+          <div class="seg seg--sm" id="timer-mode" style="--n:2;--i:0">
+            <button type="button" data-action="timer-mode" data-mode="focus" aria-pressed="true">25 min</button>
+            <button type="button" data-action="timer-mode" data-mode="break" aria-pressed="false">5 min</button>
+          </div>
+        </header>
+        <div class="timer">
+          <svg class="timer__ring" viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="ring-bg" cx="60" cy="60" r="52" />
+            <circle class="ring-fg" id="timer-ring" cx="60" cy="60" r="52" />
+          </svg>
+          <div class="timer__center">
+            <span class="timer__time" id="timer-time" role="timer">25:00</span>
+            <span class="timer__label" id="timer-label">Concentración</span>
+          </div>
+        </div>
+        <div class="timer__controls">
+          <button type="button" class="btn btn--soft btn--icon" data-action="timer-reset" aria-label="Reiniciar" data-icon="reset"></button>
+          <button type="button" class="btn btn--primary" id="timer-toggle" data-action="timer-toggle">Empezar</button>
+        </div>
+        <p class="widget__note" id="timer-sessions"></p>
+      </section>
+
+      <section class="widget glass spot" id="w-music" aria-label="Spotify" hidden>
+        <header class="widget__head"><h3>Música</h3><span class="widget__meta spotify-dot">Spotify</span></header>
+        <div class="music">
+          <div class="music__art" id="music-art" aria-hidden="true"><span data-icon="music"></span></div>
+          <div class="music__info"><p class="music__title" id="music-title">Nada en reproducción</p><p class="music__artist" id="music-artist"></p></div>
+        </div>
+        <div class="music__progress" aria-hidden="true"><i id="music-bar"></i></div>
+        <div class="music__controls">
+          <button type="button" class="icon-btn" data-int="music-prev" aria-label="Anterior" data-icon="prev"></button>
+          <button type="button" class="btn btn--primary btn--icon" id="music-play" data-int="music-toggle" aria-label="Reproducir"></button>
+          <button type="button" class="icon-btn" data-int="music-next" aria-label="Siguiente" data-icon="next"></button>
+        </div>
+        <div class="music__pick">
+          <select id="music-list" class="mini-select" aria-label="Lista de Spotify"></select>
+          <button type="button" class="btn btn--soft btn--sm" data-int="music-start">Poner</button>
+        </div>
+      </section>
+
+      <section class="widget glass spot" id="w-agenda" aria-labelledby="agenda-title" hidden>
+        <header class="widget__head"><h3 id="agenda-title">Agenda externa</h3><span class="widget__meta">Google · Outlook</span></header>
+        <ul class="mini-list" id="agenda-list"></ul>
+      </section>
+
+      <section class="widget glass spot" id="w-mail" aria-labelledby="mail-title" hidden>
+        <header class="widget__head"><h3 id="mail-title">Correo</h3>
+          <span class="widget__meta" id="mail-count"></span>
+          <button type="button" class="icon-btn icon-btn--sm" data-int="mail-refresh" aria-label="Actualizar correo" data-icon="reset"></button></header>
+        <ul class="mail-list" id="mail-list"></ul>
+      </section>
+
+      <section class="widget glass spot" aria-labelledby="rem-title">
+        <header class="widget__head"><h3 id="rem-title">Próximos recordatorios</h3></header>
+        <ul class="mini-list" id="rem-list"></ul>
+      </section>
+
+      <section class="widget glass spot" aria-labelledby="week-title">
+        <header class="widget__head"><h3 id="week-title">Tu semana</h3><span class="widget__meta" id="week-total"></span></header>
+        <div class="bars" id="week-bars" role="img" aria-label="Tareas completadas en los últimos 7 días"></div>
+      </section>
+    </aside>
+  </div>
+
+  <!-- ===== Popovers (fuera de elementos con blur para que el cristal funcione) ===== -->
+  <div class="popover glass" id="pop-bell" role="dialog" aria-label="Recordatorios" hidden>
+    <div class="pop__head">
+      <h3>Recordatorios</h3>
+      <button type="button" class="btn btn--ghost btn--sm" data-action="log-read">Marcar leídos</button>
+    </div>
+    <ul class="log-list" id="log-list"></ul>
+    <div class="pop__foot" id="notif-foot"></div>
+  </div>
+
+  <div class="popover glass" id="pop-settings" role="dialog" aria-label="Ajustes" hidden>
+    <div class="pop__head"><h3>Ajustes</h3></div>
+    <div class="pop__row">
+      <span>Tema</span>
+      <div class="seg seg--sm" id="set-theme" style="--n:3;--i:0">
+        <button type="button" data-action="set-theme" data-theme="auto">Auto</button>
+        <button type="button" data-action="set-theme" data-theme="light">Claro</button>
+        <button type="button" data-action="set-theme" data-theme="dark">Oscuro</button>
+      </div>
+    </div>
+    <div class="pop__row">
+      <span>Color</span>
+      <div class="swatches" id="set-accent">
+        <button type="button" data-action="set-accent" data-accent="indigo" style="--c:#6B74F5" aria-label="Índigo"></button>
+        <button type="button" data-action="set-accent" data-accent="violet" style="--c:#9B5CF6" aria-label="Violeta"></button>
+        <button type="button" data-action="set-accent" data-accent="coral" style="--c:#F0566B" aria-label="Coral"></button>
+        <button type="button" data-action="set-accent" data-accent="teal" style="--c:#14A38B" aria-label="Turquesa"></button>
+        <button type="button" data-action="set-accent" data-accent="sky" style="--c:#2D8CF0" aria-label="Cielo"></button>
+      </div>
+    </div>
+    <div class="pop__row">
+      <span>Sonidos</span>
+      <button type="button" class="switch" id="set-sound" role="switch" aria-checked="true" aria-label="Sonidos" data-action="toggle-sound"><i></i></button>
+    </div>
+    <div class="pop__row">
+      <span>Avisos del sistema</span>
+      <button type="button" class="btn btn--soft btn--sm" id="set-notif" data-action="enable-notif">Activar</button>
+    </div>
+    <hr>
+    <div class="pop__stack">
+      <button type="button" class="btn btn--soft btn--sm" data-action="open-conn" data-tab="accounts"><span data-icon="plug"></span> Conexiones y cuentas</button>
+      <button type="button" class="btn btn--soft btn--sm" data-action="open-conn" data-tab="ai"><span data-icon="sparkle"></span> IA y servidores MCP</button>
+      <div id="install-row" hidden><button type="button" class="btn btn--primary btn--sm" data-action="install-app" style="width:100%"><span data-icon="download"></span> Instalar TaskFlow en este dispositivo</button></div>
+    </div>
+    <hr>
+    <div class="pop__stack">
+      <button type="button" class="btn btn--soft btn--sm" data-action="export-json"><span data-icon="download"></span> Exportar copia (JSON)</button>
+      <button type="button" class="btn btn--soft btn--sm" data-action="export-ics"><span data-icon="calendar"></span> Exportar calendario (.ics)</button>
+      <button type="button" class="btn btn--soft btn--sm" data-action="import-json"><span data-icon="upload"></span> Importar copia</button>
+      <input type="file" id="import-file" accept="application/json,.json" hidden>
+      <button type="button" class="link-danger" data-action="reset-all">Restablecer todos los datos</button>
+    </div>
+  </div>
+
+  <!-- ===== Diálogo: tarea ===== -->
+  <dialog class="sheet glass" id="task-dialog" aria-labelledby="dlg-title">
+    <form id="task-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="dlg-title">Nueva tarea</h2>
+        <button type="button" class="icon-btn icon-btn--sm" data-close aria-label="Cerrar" data-icon="x"></button>
+      </header>
+
+      <div class="sheet__body">
+        <div class="field">
+          <label for="f-title">Título</label>
+          <input type="text" id="f-title" maxlength="100" placeholder="Ej: Preparar la reunión del lunes">
+          <p class="field__error" id="f-error" aria-live="polite"></p>
+        </div>
+
+        <div class="field">
+          <label for="f-desc">Notas <span class="muted">(opcional)</span></label>
+          <textarea id="f-desc" rows="3" maxlength="400" placeholder="Detalles, enlaces, contexto…"></textarea>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="f-due">Fecha</label>
+            <input type="date" id="f-due">
+          </div>
+          <div class="field">
+            <label for="f-time">Hora</label>
+            <input type="time" id="f-time">
+          </div>
+        </div>
+
+        <div class="chips-row" id="quick-dates" aria-label="Fechas rápidas">
+          <button type="button" class="pill" data-qd="0">Hoy</button>
+          <button type="button" class="pill" data-qd="1">Mañana</button>
+          <button type="button" class="pill" data-qd="7">En una semana</button>
+          <button type="button" class="pill" data-qd="none">Sin fecha</button>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="f-reminder">Recordatorio</label>
+            <select id="f-reminder"></select>
+          </div>
+          <div class="field">
+            <label for="f-repeat">Repetir</label>
+            <select id="f-repeat"></select>
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="f-cat">Lista</label>
+            <select id="f-cat"></select>
+          </div>
+          <fieldset class="field fieldset">
+            <legend>Importancia</legend>
+            <div class="seg" id="f-prio" style="--n:3;--i:1">
+              <input type="radio" name="priority" id="p-baja" value="baja"><label for="p-baja">Baja</label>
+              <input type="radio" name="priority" id="p-media" value="media" checked><label for="p-media">Media</label>
+              <input type="radio" name="priority" id="p-alta" value="alta"><label for="p-alta">Alta</label>
+            </div>
+          </fieldset>
+        </div>
+
+        <div class="field">
+          <label>Subtareas</label>
+          <div id="sub-list" class="sub-edit"></div>
+          <button type="button" class="btn btn--soft btn--sm" id="sub-add"><span data-icon="plus"></span> Añadir subtarea</button>
+        </div>
+      </div>
+
+      <footer class="sheet__foot">
+        <button type="button" class="btn btn--danger" id="f-delete" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn--soft" data-close>Cancelar</button>
+        <button type="submit" class="btn btn--primary" id="f-submit">Guardar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ===== Diálogo: lista ===== -->
+  <dialog class="sheet sheet--sm glass" id="cat-dialog" aria-labelledby="cat-title">
+    <form id="cat-form" novalidate>
+      <header class="sheet__head">
+        <h2 id="cat-title">Nuevo proyecto</h2>
+        <button type="button" class="icon-btn icon-btn--sm" data-close aria-label="Cerrar" data-icon="x"></button>
+      </header>
+      <div class="sheet__body">
+        <div class="field">
+          <label for="c-name">Nombre</label>
+          <input type="text" id="c-name" maxlength="24" placeholder="Ej: Proyectos">
+          <p class="field__error" id="c-error" aria-live="polite"></p>
+        </div>
+        <fieldset class="field fieldset">
+          <legend>Color</legend>
+          <div class="swatches swatches--lg" id="c-colors"></div>
+        </fieldset>
+      </div>
+      <footer class="sheet__foot">
+        <button type="button" class="btn btn--danger" id="c-delete" hidden>Eliminar</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn--soft" data-close>Cancelar</button>
+        <button type="submit" class="btn btn--primary">Guardar</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- ===== Diálogo: conexiones ===== -->
+  <dialog class="sheet sheet--wide glass" id="conn-dialog" aria-labelledby="conn-title">
+    <header class="sheet__head">
+      <h2 id="conn-title">Conexiones</h2>
+      <button type="button" class="icon-btn icon-btn--sm" data-close aria-label="Cerrar" data-icon="x"></button>
+    </header>
+    <div class="conn-tabs-wrap">
+      <div class="seg" id="conn-tabs" style="--n:3;--i:0" role="tablist">
+        <button type="button" data-tab="accounts" aria-pressed="true">Cuentas</button>
+        <button type="button" data-tab="ai" aria-pressed="false">IA</button>
+        <button type="button" data-tab="mcp" aria-pressed="false">MCP</button>
+      </div>
+    </div>
+    <div class="sheet__body conn-body" id="conn-body"></div>
+    <footer class="sheet__foot"><span class="spacer"></span><button type="button" class="btn btn--primary" data-close>Listo</button></footer>
+  </dialog>
+
+  <!-- ===== Asistente de IA ===== -->
+  <aside class="ai glass" id="ai-panel" aria-label="Asistente de IA" hidden>
+    <header class="ai__head">
+      <div class="ai__title"><span class="ai__badge" data-icon="sparkle"></span><h2>Asistente</h2></div>
+      <div class="ai__tools">
+        <select id="ai-provider" class="mini-select" aria-label="Proveedor de IA"></select>
+        <button type="button" class="icon-btn icon-btn--sm" id="ai-clear" aria-label="Borrar conversación" title="Borrar conversación" data-icon="trash"></button>
+        <button type="button" class="icon-btn icon-btn--sm" id="ai-close" aria-label="Cerrar asistente" data-icon="x"></button>
+      </div>
+    </header>
+    <div class="ai__msgs" id="ai-msgs" aria-live="polite"></div>
+    <div class="ai__suggest" id="ai-suggest"></div>
+    <form class="ai__form" id="ai-form">
+      <textarea id="ai-input" rows="1" placeholder="Pídeme algo: “Crea una tarea para el viernes…”" aria-label="Mensaje para el asistente"></textarea>
+      <button type="submit" class="btn btn--primary btn--icon" id="ai-send" aria-label="Enviar" data-icon="send"></button>
+    </form>
+  </aside>
+
+  <!-- ===== Paleta de comandos ===== -->
+  <dialog class="sheet sheet--palette glass" id="palette" aria-label="Paleta de comandos">
+    <div class="pal__search">
+      <span data-icon="search"></span>
+      <input type="text" id="pal-input" placeholder="Busca una tarea o escribe un comando…" autocomplete="off" aria-label="Buscar comando">
+      <kbd>esc</kbd>
+    </div>
+    <ul class="pal__list" id="pal-list" role="listbox"></ul>
+  </dialog>
+
+  <!-- ===== Avisos ===== -->
+  <div class="banners" id="banners" aria-live="assertive"></div>
+
+  <div class="toast glass" id="toast" role="status" aria-live="polite">
+    <span id="toast-msg"></span>
+    <button type="button" id="toast-action"></button>
+  </div>
+
+  <button type="button" class="fab" data-action="new-task" aria-label="Nueva tarea" data-icon="plus"></button>
+
+  <canvas id="confetti" aria-hidden="true"></canvas>
+
+  <script src="app.js"></script>
+  <script src="integrations.js"></script>
+  <script src="ai.js"></script>
+  <script src="wallpapers.js"></script>
+  <script src="groups.js"></script>
+  <script src="cloud-config.js"></script>
+  <script src="cloud.js"></script>
+</body>
+</html>
