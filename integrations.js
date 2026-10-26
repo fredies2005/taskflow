@@ -28,6 +28,12 @@ function loadConn() {
 }
 let conn = loadConn();
 function saveConn() { try { localStorage.setItem(CONN_KEY, JSON.stringify(conn)); } catch { /* ignorar */ } }
+/* Client ID "de la casa": si quien aloja TaskFlow lo pone en cloud-config.js (window.TF_CONNECT), el usuario final
+   conecta con un solo clic y no ve ningún Client ID. Si no, cada usuario puede pegar el suyo. */
+const presetId = (p) => String(window.TF_CONNECT?.[p]?.clientId || "").trim();
+const clientIdOf = (p) => presetId(p) || String(conn[p]?.clientId || "").trim();
+const fbGoogleOk = () => typeof cloudRequired === "function" && cloudRequired() && typeof fbAuth !== "undefined" && !!fbAuth;
+const oneClick = (p) => !!presetId(p) || (p === "google" && fbGoogleOk());
 
 /* ===== HTTP ===== */
 async function api(url, { method = "GET", headers = {}, body, token } = {}) {
@@ -86,14 +92,14 @@ function secureOk() {
 
 async function oauthStart(provider) {
   const c = conn[provider];
-  if (!c.clientId.trim()) { showToast("Pega primero el Client ID."); return; }
+  if (!clientIdOf(provider)) { showToast("Este conector aún no está configurado. Pega el Client ID en Cuentas."); return; }
   if (!secureOk()) return;
   const { verifier, challenge } = await pkce();
   const state = randStr(24);
   sessionStorage.setItem("tf.oauth." + state, JSON.stringify({ provider, verifier }));
   const cfg = OAUTH[provider];
   const p = new URLSearchParams({
-    client_id: c.clientId.trim(), response_type: "code", redirect_uri: REDIRECT,
+    client_id: clientIdOf(provider), response_type: "code", redirect_uri: REDIRECT,
     scope: cfg.scope, code_challenge: challenge, code_challenge_method: "S256", state, ...cfg.extra,
   });
   const hint = accountEmail();
@@ -103,7 +109,7 @@ async function oauthStart(provider) {
 
 async function tokenRequest(provider, params) {
   const c = conn[provider], cfg = OAUTH[provider];
-  return api(cfg.token(c), { method: "POST", body: new URLSearchParams({ client_id: c.clientId.trim(), ...params }) });
+  return api(cfg.token(c), { method: "POST", body: new URLSearchParams({ client_id: clientIdOf(provider), ...params }) });
 }
 function saveTokens(provider, tok) {
   const c = conn[provider];
@@ -146,12 +152,30 @@ function loadGIS() {
     document.head.append(s);
   });
 }
+/* Sin Client ID: se usa el propio inicio de sesión de Google de Firebase pidiendo los permisos de Calendar y Gmail.
+   El usuario solo elige su cuenta de Google y acepta. (El token dura ~1 h; al caducar se vuelve a pedir con un clic.) */
+async function googleViaFirebase() {
+  const prov = new firebase.auth.GoogleAuthProvider();
+  GOOGLE_SCOPE.split(" ").forEach((sc) => prov.addScope(sc));
+  const em = accountEmail(); prov.setCustomParameters({ prompt: "consent", ...(em ? { login_hint: em } : {}) });
+  const u = fbAuth.currentUser;
+  const hasG = u && (u.providerData || []).some((d) => d.providerId === "google.com");
+  const r = !u ? await fbAuth.signInWithPopup(prov) : hasG ? await u.reauthenticateWithPopup(prov) : await u.linkWithPopup(prov);
+  const tok = r.credential && r.credential.accessToken;
+  if (!tok) throw new Error("Google no devolvió permisos. Inténtalo de nuevo.");
+  const g = conn.google; g.access = tok; g.exp = Date.now() + 55 * 60 * 1000; g.scope = GOOGLE_SCOPE; g.connected = true; g.expired = false; saveConn();
+  return tok;
+}
 function googleRequest(prompt = "consent") {
+  if (!clientIdOf("google") && fbGoogleOk()) {
+    if (prompt === "") return Promise.reject(new Error("necesita un clic")); // sin gesto del usuario el navegador bloquea el popup
+    return googleViaFirebase();
+  }
   return new Promise(async (res, rej) => {
     try {
       await loadGIS();
       const tc = google.accounts.oauth2.initTokenClient({
-        client_id: conn.google.clientId.trim(), scope: GOOGLE_SCOPE, hint: accountEmail() || undefined,
+        client_id: clientIdOf("google"), scope: GOOGLE_SCOPE, hint: accountEmail() || undefined,
         callback: (r) => {
           if (r.error) return rej(new Error(r.error_description || r.error));
           const g = conn.google;
@@ -205,7 +229,7 @@ function linkGate() {
   if (!u) { showToast("Inicia sesión en TaskFlow para vincular conectores."); typeof openAccount === "function" && openAccount(); return false; }
   if (/privaterelay\.appleid\.com$/i.test(u.email || "")) { showToast("Tu cuenta usa un correo privado de Apple: no puede coincidir con Google u Outlook. Entra con otro método."); return false; }
   if (!u.emailVerified) { showToast("Verifica primero tu correo (te lo enviamos al registrarte)."); typeof openAccount === "function" && openAccount(); return false; }
-  if ((conn.linkEmail || "").trim().toLowerCase() !== (u.email || "").toLowerCase()) { showToast(`Escribe ${u.email} como correo de vinculación.`); return false; }
+  conn.linkEmail = u.email || ""; saveConn(); // ya no hay que escribirlo: se usa el de tu cuenta
   return true;
 }
 async function linkedEmailOf(provider) {
@@ -233,9 +257,7 @@ function linkCard() {
   const u = cloudUser();
   if (!u) return `<div class="notice is-warn"><p><strong>Inicia sesión para vincular conectores.</strong> Solo se pueden vincular cuentas de Google, Outlook o Spotify cuyo correo coincida con el de tu cuenta TaskFlow.</p>
     <div class="conn-actions"><button type="button" class="btn btn--primary btn--sm" data-action="open-account">Iniciar sesión</button></div></div>`;
-  return `<section class="conn-card"><header class="conn-card__head"><span class="conn-logo" style="--c:var(--accent)">${icon("link")}</span><div><h3>Correo de vinculación</h3><p>Debe ser el de tu cuenta: ${esc(u.email || "")}</p></div></header>
-    <div class="field"><label for="link-email">Escribe tu correo para poder vincular</label><input type="email" id="link-email" data-conn-field="linkEmail" value="${esc(conn.linkEmail || "")}" placeholder="${esc(u.email || "")}" autocomplete="off" spellcheck="false"></div>
-    <p class="muted">Al conectar Google, Outlook o Spotify comprobamos que la cuenta elegida tenga exactamente este correo; si no coincide se desconecta.</p></section>`;
+  return `<div class="notice"><p><strong>Cuenta: ${esc(u.email || "")}.</strong> Al conectar Google, Outlook o Spotify comprobamos que la cuenta elegida tenga este mismo correo.</p></div>`;
 }
 
 const isOn = (p) => !!conn[p].connected;
@@ -532,13 +554,13 @@ function providerCard({ id, name, desc, color, letter, fields, help, extra = "" 
       <span class="conn-logo conn-logo--brand" style="--c:${color}">${LOGOS[id] || letter}</span>
       <div><h3>${name}</h3><p>${desc}</p></div>${statusChip(on, c.expired)}
     </header>
-    ${fields}
+    ${oneClick(id) ? "" : fields}
     ${extra}
     <div class="conn-actions">
       ${on ? `<button type="button" class="btn btn--soft btn--sm" data-conn="disconnect" data-prov="${id}">Desconectar</button>` : ""}
-      <button type="button" class="btn btn--primary btn--sm" data-conn="connect" data-prov="${id}">${on ? "Volver a autorizar" : "Conectar"}</button>
+      <button type="button" class="btn btn--primary btn--sm" data-conn="connect" data-prov="${id}">${on ? "Volver a autorizar" : oneClick(id) ? `Continuar con ${name.split(" ")[0]}` : "Conectar"}</button>
     </div>
-    <details class="conn-help"><summary>Cómo conseguir el Client ID</summary>${help}</details>
+    ${oneClick(id) ? "" : `<details class="conn-help"><summary>Cómo conseguir el Client ID</summary>${help}</details>`}
   </section>`;
 }
 const idField = (id, label = "Client ID") => `<div class="field"><label for="cid-${id}">${label}</label><input type="text" id="cid-${id}" data-conn-field="${id}.clientId" value="${esc(conn[id].clientId)}" placeholder="Pega aquí tu Client ID" autocomplete="off" spellcheck="false"></div>`;
@@ -551,11 +573,11 @@ function accountsTab() {
     ${sandbox ? `<div class="notice is-warn"><p><strong>Estás en la versión alojada dentro de Claude.</strong> Este entorno bloquea por seguridad las conexiones a Google, Outlook, Spotify, otras IAs y servidores MCP: los botones de conectar no pueden funcionar aquí. Para usarlos, abre la versión completa de TaskFlow desde tu propio servidor (carpeta <code>taskflow</code>, ver README). La IA <b>Claude integrado</b> sí funciona aquí sin claves.</p></div>` : ""}
     ${local ? `<div class="notice is-warn"><strong>Estás abriendo TaskFlow como archivo (file://).</strong> Para conectar cuentas necesita servirse por HTTP: en la carpeta de la app ejecuta <code>python3 -m http.server 5173</code> y abre <code>http://localhost:5173</code>.</div>` : ""}
     ${linkCard()}
-    <div class="notice">
+    ${["google", "microsoft", "spotify"].every(oneClick) ? "" : `<div class="notice">
       <p>Dirección de esta app (regístrala como <em>redirect URI</em> / origen autorizado):</p>
       <div class="copy-row"><code id="redirect-uri">${esc(REDIRECT)}</code><button type="button" class="btn btn--soft btn--sm" data-conn="copy-redirect">${icon("copy")} Copiar</button></div>
       <p class="muted">Tus Client ID y tokens se guardan solo en este dispositivo. Nunca se envían a ningún servidor de TaskFlow.</p>
-    </div>
+    </div>`}
 
     ${providerCard({
       id: "google", name: "Google", desc: "Calendar y Gmail", color: "#4285F4", letter: "G",
@@ -623,7 +645,7 @@ connDlg.addEventListener("click", async (e) => {
   if (act === "connect" && !linkGate()) return;
   if (act === "connect") {
     if (prov === "google") {
-      if (!conn.google.clientId.trim()) return showToast("Pega primero el Client ID.");
+      if (!oneClick("google") && !clientIdOf("google")) return showToast("Pega primero el Client ID.");
       if (!secureOk()) return;
       try { await googleRequest("consent"); if (!(await verifyLinked("google"))) return; showToast("Google conectado"); refreshAll(true); renderConn(); }
       catch (err) { showToast("Google: " + err.message); }
