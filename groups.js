@@ -12,7 +12,15 @@
    ===================================================================== */
 
 const G_COLORS = ["#6B74F5", "#9B5CF6", "#F0566B", "#14A38B", "#2D8CF0", "#F59E0B", "#EC4899", "#10B981"];
-const G_EMOJI = ["👥", "🚀", "🎓", "🏠", "💼", "🎨", "🌱", "⚽", "🎉", "📚", "🛠️", "✈️"];
+const G_EMOJI = ["👥", "🚀", "🎓", "🏠", "💼", "🎨", "🌱", "⚽", "🎉", "📚", "🛠️", "✈️", "🍕", "🎮", "🎵", "💡", "🧠", "🏋️", "🐶", "🌍"];
+const G_TPL = [
+  { n: "Estudios", e: "🎓", c: "#6B74F5", d: "Trabajos y exámenes" },
+  { n: "Trabajo", e: "💼", c: "#2D8CF0", d: "Equipo y proyectos" },
+  { n: "Casa", e: "🏠", c: "#14A38B", d: "Tareas del hogar" },
+  { n: "Amigos", e: "🎉", c: "#EC4899", d: "Planes y quedadas" },
+  { n: "Viaje", e: "✈️", c: "#F59E0B", d: "Organizar una escapada" },
+  { n: "Proyecto", e: "🚀", c: "#9B5CF6", d: "Algo propio en equipo" },
+];
 const G_PRIO = { alta: "Alta", media: "Media", baja: "Baja" };
 const GR = {
   groups: new Map(), invites: [], active: null, tab: "tasks", filter: "all",
@@ -133,10 +141,10 @@ function groupsRender() {
     area.dataset.gid = id;
     area.innerHTML = `
       <header class="g-head glass spot" id="g-head"></header>
-      <div class="g-tabs"><div class="seg" id="g-tabs" style="--n:3;--i:0" role="tablist">
-        <button type="button" data-g="tab" data-tab="tasks" aria-pressed="true">Tareas</button>
-        <button type="button" data-g="tab" data-tab="chat" aria-pressed="false">Chat</button>
-        <button type="button" data-g="tab" data-tab="members" aria-pressed="false">Miembros</button></div></div>
+      <div class="g-tabs"><div class="seg g-seg" id="g-tabs" style="--n:3;--i:0" role="tablist">
+        <button type="button" data-g="tab" data-tab="tasks" aria-pressed="true">${icon("subs")}<span>Tareas</span><em class="g-badge" id="gb-tasks" hidden></em></button>
+        <button type="button" data-g="tab" data-tab="chat" aria-pressed="false">${icon("send")}<span>Chat</span><em class="g-badge g-badge--dot" id="gb-chat" hidden></em></button>
+        <button type="button" data-g="tab" data-tab="members" aria-pressed="false">${icon("users")}<span>Miembros</span><em class="g-badge" id="gb-members" hidden></em></button></div></div>
       <div id="g-pane-tasks"></div>
       <div id="g-pane-chat" hidden></div>
       <div id="g-pane-members" hidden></div>`;
@@ -149,6 +157,11 @@ function gRenderTabs() {
   $("#g-tabs")?.style.setProperty("--i", tabs.indexOf(GR.tab));
   $$("#g-tabs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.tab === GR.tab));
   tabs.forEach((t) => { const p = $("#g-pane-" + t); if (p) p.hidden = t !== GR.tab; });
+  const g = gGroup(); if (!g) return;
+  const s = gStats(), set = (id, txt, on) => { const el = $(id); if (el) { el.textContent = txt; el.hidden = !on; } };
+  set("#gb-tasks", s.total - s.done, s.total - s.done > 0);
+  set("#gb-chat", "", gUnread(g.id) && GR.tab !== "chat");
+  set("#gb-members", g.memberIds.length, true);
 }
 function gStats() {
   const leaf = GR.tasks.filter((t) => !t.isParent), td = todayISO(), me = gMe().uid;
@@ -165,8 +178,12 @@ function gRenderHead() {
         <div class="g-members">${g.memberIds.slice(0, 6).map((u) => gAva(u, g, "g-av--stack")).join("")}<span class="muted">${g.memberIds.length} ${g.memberIds.length === 1 ? "miembro" : "miembros"}</span></div></div>
       <div class="g-head__act"><button type="button" class="btn btn--soft btn--sm" data-g="invite">${icon("link")} Invitar</button>
         <button type="button" class="icon-btn" data-g="settings" aria-label="Ajustes del grupo" title="Ajustes del grupo">${icon("sliders")}</button></div></div>
-    <div class="g-stats"><span><b>${s.mine}</b> mías pendientes</span><span><b>${s.total - s.done}</b> por hacer</span><span class="${s.over ? "is-alert" : ""}"><b>${s.over}</b> vencidas</span><span><b>${pct}%</b> completado</span></div>
-    <div class="proj-bar"><i style="width:${pct}%"></i></div>`;
+    <div class="g-tiles">
+      <div class="g-tile"><b>${s.mine}</b><span>Mías pendientes</span></div>
+      <div class="g-tile"><b>${s.total - s.done}</b><span>Por hacer</span></div>
+      <div class="g-tile ${s.over ? "is-alert" : ""}"><b>${s.over}</b><span>Vencidas</span></div>
+      <div class="g-tile g-tile--ring" style="--p:${pct}"><b>${pct}%</b><span>Completado</span></div>
+    </div>`;
 }
 const gDueChip = (t) => {
   if (!t.due) return "";
@@ -205,7 +222,13 @@ function gRenderTasks() {
       <div class="proj-bar proj-bar--sm"><i style="width:${pct}%"></i></div>${shown.map((k) => gTaskRow(k, true)).join("") || `<p class="muted g-none">Sin partes todavía.</p>`}</section>`;
   }).join("");
   if (orphans.length) html += `<section class="g-list">${orphans.map((t) => gTaskRow(t)).join("")}</section>`;
-  if (!html) html = `<div class="empty"><div class="empty__ic">${icon("inbox")}</div><h3>${GR.tasks.length ? "Nada con ese filtro" : "El grupo está vacío"}</h3><p>${GR.tasks.length ? "Prueba con otro filtro." : "Añade una tarea o usa «Repartir» para dividir un trabajo entre todos."}</p></div>`;
+  if (!html && !GR.tasks.length) html = `<div class="g-start glass"><h3>Empieza con tu grupo</h3><p class="muted">Tres pasos para ponerlo en marcha:</p>
+    <div class="g-start__grid">
+      <button type="button" class="g-step" data-g="invite"><span class="g-step__ic">${icon("link")}</span><b>1 · Invita a gente</b><span>Comparte un enlace o un correo.</span></button>
+      <button type="button" class="g-step" data-g="focus-quick"><span class="g-step__ic">${icon("plus")}</span><b>2 · Añade una tarea</b><span>Escribe arriba y pulsa Intro.</span></button>
+      <button type="button" class="g-step" data-g="split"><span class="g-step__ic">${icon("subs")}</span><b>3 · Reparte el trabajo</b><span>Divide un trabajo entre todos con plazos.</span></button>
+    </div></div>`;
+  else if (!html) html = `<div class="empty"><div class="empty__ic">${icon("inbox")}</div><h3>Nada con ese filtro</h3><p>Prueba con otro filtro.</p></div>`;
   pane.innerHTML = `<form class="quick glass" id="g-quick" autocomplete="off"><span class="quick__ic">${icon("plus")}</span>
       <input type="text" id="g-quick-input" maxlength="140" aria-label="Nueva tarea del grupo" placeholder="Añade una tarea para el grupo…"><button type="submit" class="btn btn--primary btn--sm">Añadir</button></form>
     <div class="g-bar"><div class="g-chips" role="tablist">${[["all", "Todas"], ["mine", "Mías"], ["pending", "Pendientes"], ["done", "Hechas"]].map(([k, n]) => `<button type="button" data-g="filter" data-f="${k}" aria-pressed="${f === k}">${n}</button>`).join("")}</div>
@@ -218,12 +241,14 @@ function gRenderMembers() {
   const order = { owner: 0, admin: 1, member: 2 };
   const rows = g.memberIds.slice().sort((a, b) => (order[g.members[a]] - order[g.members[b]]) || gName(a).localeCompare(gName(b))).map((u) => {
     const r = g.members[u], mine = u === gMe().uid, canManage = gIsAdmin(g) && !mine && r !== "owner" && (gRole(g) === "owner" || r === "member");
-    return `<div class="g-member">${gAva(u, g)}<div><p><b>${esc(gName(u, g))}</b>${mine ? " (tú)" : ""}</p><p class="muted">${esc(g.memberInfo?.[u]?.email || "")}</p></div>
+    const mineT = GR.tasks.filter((t) => !t.isParent && t.assigneeId === u);
+    return `<article class="g-mcard ${mine ? "is-me" : ""}">${gAva(u, g, "g-av--lg2")}<b class="g-mcard__n">${esc(gName(u, g))}${mine ? " (tú)" : ""}</b>
       <span class="status ${r !== "member" ? "is-on" : ""}">${{ owner: "Creador", admin: "Admin", member: "Miembro" }[r]}</span>
-      ${canManage ? `<button type="button" class="btn btn--ghost btn--sm" data-g="role" data-uid="${u}">${r === "admin" ? "Quitar admin" : "Hacer admin"}</button><button type="button" class="btn btn--ghost btn--sm" data-g="kick" data-uid="${u}" data-confirm="0">Quitar</button>` : ""}</div>`;
+      <span class="muted g-mcard__s">${mineT.filter((t) => !t.done).length} pendientes · ${mineT.filter((t) => t.done).length} hechas</span>
+      ${canManage ? `<div class="g-mcard__act"><button type="button" class="btn btn--ghost btn--sm" data-g="role" data-uid="${u}">${r === "admin" ? "Quitar admin" : "Hacer admin"}</button><button type="button" class="btn btn--ghost btn--sm" data-g="kick" data-uid="${u}" data-confirm="0">Quitar</button></div>` : ""}</article>`;
   }).join("");
-  const pend = (g.pendingEmails || []).map((e) => `<div class="g-member"><span class="g-av" style="--c:#8E97B8">✉</span><div><p>${esc(e)}</p><p class="muted">Invitación pendiente</p></div>${gIsAdmin(g) ? `<button type="button" class="btn btn--ghost btn--sm" data-g="unpend" data-email="${esc(e)}">Cancelar</button>` : ""}</div>`).join("");
-  pane.innerHTML = `<section class="conn-card g-card">${rows}${pend}<div class="conn-actions"><button type="button" class="btn btn--primary btn--sm" data-g="invite">${icon("plus")} Invitar personas</button></div></section>`;
+  const pend = (g.pendingEmails || []).map((e) => `<article class="g-mcard g-mcard--pend"><span class="g-av g-av--lg2" style="--c:#8E97B8">✉</span><b class="g-mcard__n">${esc(e)}</b><span class="status">Pendiente</span>${gIsAdmin(g) ? `<div class="g-mcard__act"><button type="button" class="btn btn--ghost btn--sm" data-g="unpend" data-email="${esc(e)}">Cancelar</button></div>` : ""}</article>`).join("");
+  pane.innerHTML = `<div class="g-mgrid">${rows}${pend}<button type="button" class="g-mcard g-mcard--add" data-g="invite"><span class="g-step__ic">${icon("plus")}</span><b>Invitar personas</b><span class="muted">Enlace o correo</span></button></div>`;
 }
 
 /* ===================== Chat ===================== */
@@ -266,8 +291,12 @@ const emojis = (name, cur) => G_EMOJI.map((e) => `<label class="em"><input type=
 /* --- Crear / unirse --- */
 const gCreateDlg = gDialog("g-create-dialog", "sheet--sm", `${head("Grupos")}
   <div class="sheet__body g-form">
-    <div class="seg" id="gc-tabs" style="--n:2;--i:0"><button type="button" data-gc="create" aria-pressed="true">Crear grupo</button><button type="button" data-gc="join" aria-pressed="false">Unirme con enlace</button></div>
+    <div class="gc-modes" id="gc-tabs">
+      <button type="button" data-gc="create" aria-pressed="true"><span class="gc-modes__ic">${icon("plus")}</span><b>Crear un grupo</b><span>Empieza desde cero</span></button>
+      <button type="button" data-gc="join" aria-pressed="false"><span class="gc-modes__ic">${icon("link")}</span><b>Unirme a uno</b><span>Tengo un enlace</span></button></div>
     <form id="gc-create" novalidate>
+      <div class="gc-prev" id="gc-prev" style="--c:${G_COLORS[0]}"><span class="g-ava g-ava--lg" id="gc-prev-ava">${G_EMOJI[0]}</span><div><b id="gc-prev-name">Nombre del grupo</b><span class="muted">1 miembro · tú</span></div></div>
+      <div class="field"><label>Empieza con una plantilla</label><div class="gc-tpls">${G_TPL.map((t, i) => `<button type="button" class="gc-tpl" data-tpl="${i}" style="--c:${t.c}"><span>${t.e}</span><b>${t.n}</b><em>${t.d}</em></button>`).join("")}</div></div>
       <div class="field"><label for="gc-name">Nombre del grupo</label><input type="text" id="gc-name" maxlength="40" placeholder="Ej: Trabajo de Historia, Reforma casa"></div>
       <fieldset class="field fieldset"><legend>Icono</legend><div class="emojis">${emojis("gc-emoji", G_EMOJI[0])}</div></fieldset>
       <fieldset class="field fieldset"><legend>Color</legend><div class="swatches swatches--lg">${swatches("gc-color", G_COLORS[0])}</div></fieldset>
@@ -284,8 +313,26 @@ function gOpenCreate(tab = "create") {
   $("#gc-err").textContent = ""; $("#gj-err").textContent = "";
   gcTab(tab); openDialog(gCreateDlg);
 }
+function gcPreview() {
+  const nm = $("#gc-name").value.trim(), em = $("input[name=gc-emoji]:checked"), co = $("input[name=gc-color]:checked");
+  $("#gc-prev").style.setProperty("--c", co ? co.value : G_COLORS[0]);
+  $("#gc-prev-ava").textContent = em ? em.value : G_EMOJI[0];
+  $("#gc-prev-name").textContent = nm || "Nombre del grupo";
+  $("#gc-prev-name").classList.toggle("is-ph", !nm);
+}
+$("#gc-create").addEventListener("input", gcPreview);
+$("#gc-create").addEventListener("change", gcPreview);
+$("#gc-create").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tpl]"); if (!b) return;
+  const t = G_TPL[+b.dataset.tpl];
+  const cur = $("#gc-name").value.trim();
+  if (!cur || G_TPL.some((x) => x.n === cur)) $("#gc-name").value = t.n;
+  const em = $$("input[name=gc-emoji]").find((i) => i.value === t.e); if (em) em.checked = true;
+  const co = $$("input[name=gc-color]").find((i) => i.value === t.c); if (co) co.checked = true;
+  $$(".gc-tpl").forEach((x) => x.classList.toggle("is-on", x === b));
+  gcPreview();
+});
 function gcTab(t) {
-  $("#gc-tabs").style.setProperty("--i", t === "join" ? 1 : 0);
   $$("#gc-tabs button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.gc === t));
   $("#gc-create").hidden = t !== "create"; $("#gc-join").hidden = t !== "join";
 }
@@ -298,7 +345,7 @@ $("#gc-create").addEventListener("submit", async (e) => {
   try {
     await ref.set({ name, emoji: $("input[name=gc-emoji]:checked").value, color: $("input[name=gc-color]:checked").value, ownerId: me.uid, createdAt: Date.now(),
       inviteCode: gCode(), memberIds: [me.uid], members: { [me.uid]: "owner" }, memberInfo: { [me.uid]: gMeInfo() }, pendingEmails: [] });
-    $("#gc-name").value = ""; closeDialog(gCreateDlg); showToast("Grupo creado"); setView("grp:" + ref.id);
+    $("#gc-name").value = ""; $$(".gc-tpl").forEach((x) => x.classList.remove("is-on")); gcPreview(); closeDialog(gCreateDlg); showToast("Grupo creado"); setView("grp:" + ref.id);
   } catch (er) { $("#gc-err").textContent = gErr(er); }
 });
 function gParseJoin(txt) {
@@ -498,6 +545,7 @@ document.addEventListener("click", async (e) => {
     else if (a === "edit") gOpenTask(id);
     else if (a === "add-child") gOpenTask(null, { parentId: id });
     else if (a === "split") gOpenSplit();
+    else if (a === "focus-quick") $("#g-quick-input")?.focus();
     else if (a === "invite" || a === "settings") gOpenInfo();
     else if (a === "copy") { try { await navigator.clipboard.writeText(b.dataset.text); showToast("Enlace copiado"); } catch { showToast("Cópialo manualmente."); } }
     else if (a === "del-msg") await fbDb.doc(`groups/${g.id}/messages/${id}`).delete();
