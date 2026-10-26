@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="description" content="TaskFlow: tareas, calendario y recordatorios con diseño de cristal">
   <meta name="theme-color" content="#f4f1e8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://www.gstatic.com https://accounts.google.com https://apis.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https: wss: http://localhost:* http://127.0.0.1:*; frame-src https://accounts.google.com https://*.firebaseapp.com https://apis.google.com https://appleid.apple.com https://*.web.app; object-src 'none'; base-uri 'none'; form-action 'self'">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="TaskFlow">
@@ -15,17 +16,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <title>TaskFlow · Tareas, calendario y recordatorios</title>
-  <script>
-    /* Aplica el tema antes de pintar para evitar parpadeos */
-    try {
-      var s = (JSON.parse(localStorage.getItem("taskflow.v2")) || {}).settings || {};
-      var dark = s.theme === "dark" || (s.theme !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
-      document.documentElement.dataset.theme = dark ? "dark" : "light";
-      if (s.accent) document.documentElement.dataset.accent = s.accent;
-    } catch (e) {
-      if (matchMedia("(prefers-color-scheme: dark)").matches) document.documentElement.dataset.theme = "dark";
-    }
-  </script>
+  <script src="theme-init.js"></script>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
