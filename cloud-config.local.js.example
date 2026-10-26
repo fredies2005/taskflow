@@ -1,0 +1,14 @@
+/*
+  Copia este fichero como cloud-config.local.js y rellena tus valores reales.
+  Ese archivo debe quedar fuera de Git (ver .gitignore) para no volver a
+  activar alertas de secret scanning ni exponer credenciales en el repositorio.
+
+  window.TF_FIREBASE = {
+    apiKey: "TU_API_KEY_WEB_DE_FIREBASE",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto",
+    storageBucket: "tu-proyecto.firebasestorage.app",
+    messagingSenderId: "123456789012",
+    appId: "1:123456789012:web:abcdef1234567890"
+  };
+*/

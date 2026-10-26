@@ -1,0 +1,5 @@
+# Local secrets/config
+cloud-config.local.js
+
+# Optional local overrides
+*.local.js
