@@ -66,6 +66,12 @@ async function initCloud() {
     await loadScript(base + "firebase-app-compat.js");
     await Promise.all([loadScript(base + "firebase-auth-compat.js"), loadScript(base + "firebase-firestore-compat.js")]);
     firebase.initializeApp(FB_CFG);
+    if (window.TF_APPCHECK_KEY) {
+      try {
+        await loadScript(base + "firebase-app-check-compat.js");
+        firebase.appCheck().activate(new firebase.appCheck.ReCaptchaEnterpriseProvider(window.TF_APPCHECK_KEY), true);
+      } catch (e) { console.warn("App Check no disponible:", e.message); }
+    }
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
     fbAuth.languageCode = "es";
