@@ -598,13 +598,13 @@ function taskItem(t, i = 0, opts = {}) {
   const tags = [];
   tags.push(`<button type="button" class="tag tag--prio-${t.priority}" data-action="prio" title="Cambiar importancia" aria-label="Importancia ${PRIORITY_LABEL[t.priority]}. Pulsa para cambiar">${PRIORITY_LABEL[t.priority]}</button>`);
   if (t.due && !opts.hideDate) tags.push(`<span class="tag tag--due ${overdue ? "is-overdue" : isToday ? "is-today" : ""}">${icon("calendar")}${dueLabel(t)}</span>`);
-  else if (t.due && t.time) tags.push(`<span class="tag tag--due ${overdue ? "is-overdue" : ""}">${icon("clock")}${t.time}</span>`);
+  else if (t.due && t.time) tags.push(`<span class="tag tag--due ${overdue ? "is-overdue" : ""}">${icon("clock")}${esc(t.time)}</span>`);
   if (t.remindTs && !t.done) tags.push(`<span class="tag tag--bell" title="${t.reminded ? "Recordatorio enviado" : "Recordatorio programado"}">${icon("bell")}${REMINDERS.find((r) => r[0] === String(t.reminder))?.[1].replace("Sin recordatorio", "") || ""}</span>`);
   if (t.repeat !== "none") tags.push(`<span class="tag" title="Se repite">${icon("repeat")}${REPEATS.find((r) => r[0] === t.repeat)[1].replace("Cada ", "")}</span>`);
   if (subs.length) tags.push(`<button type="button" class="tag tag--subs" data-action="expand" aria-expanded="${open}" title="Mostrar subtareas">${icon("subs")}${subDone}/${subs.length}<span class="bar"><i style="--p:${Math.round((subDone / subs.length) * 100)}%"></i></span></button>`);
   if (!opts.hideCat) tags.push(`<span class="tag tag--cat" style="--c:${cat.color}"><i></i>${esc(cat.name)}</span>`);
 
-  return `<li class="${cls}" data-id="${t.id}" data-priority="${t.priority}" style="--i:${Math.min(i, 12)}">
+  return `<li class="${cls}" data-id="${esc(t.id)}" data-priority="${t.priority}" style="--i:${Math.min(i, 12)}">
     <button type="button" class="task__check" data-action="toggle" aria-label="${t.done ? "Marcar como pendiente" : "Marcar como hecha"}" aria-pressed="${t.done}">${CHECK_SVG}</button>
     <div class="task__body">
       <button type="button" class="task__title" data-action="edit">${highlight(t.title)}</button>
@@ -622,7 +622,7 @@ function taskItem(t, i = 0, opts = {}) {
 }
 
 function emptyState() {
-  if (query) return { ic: "search", h: "Sin resultados", p: `No hay tareas que coincidan con “${query}”.` };
+  if (query) return { ic: "search", h: "Sin resultados", p: `No hay tareas que coincidan con “${esc(query)}”.` };
   const m = {
     today: { ic: "sparkle", h: "Todo al día", p: "No tienes tareas para hoy. Añade una arriba o planifica algo en el calendario." },
     upcoming: { ic: "clock", h: "Nada en el horizonte", p: "Las tareas con fecha futura aparecerán aquí." },
