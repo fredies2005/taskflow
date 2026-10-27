@@ -1,5 +1,5 @@
 /* TaskFlow · service worker: funciona sin conexión y permite notificaciones en móvil */
-const CACHE = "taskflow-v10";
+const CACHE = "taskflow-v11";
 const SHELL = ["./", "index.html", "theme-init.js", "styles.css", "app.js", "integrations.js", "ai.js", "wallpapers.js", "groups.js", "cloud-config.js", "cloud.js", "manifest.webmanifest", "icon-192.png", "icon-512.png", "icon.svg", "logo-light.png", "logo-dark.png"];
 
 self.addEventListener("install", (e) => {
