@@ -11,6 +11,9 @@ window.TF_FIREBASE = {
 
 // Conectores en un clic: si pones aquí los Client ID públicos de TU app, los usuarios no tendrán que pegar nada.
 // Google no lo necesita si hay cuentas (Firebase): usa el inicio de sesión con Google.
+// App Check (reCAPTCHA Enterprise): clave de sitio pública; la protección se activa al registrarla en Firebase.
+window.TF_APPCHECK_KEY = "6LeEkQMuAAAAAA_SA4OE6OEiIDfOocjjZ3y28KYn";
+
 window.TF_CONNECT = {
   google: { clientId: "" },
   microsoft: { clientId: "" },
