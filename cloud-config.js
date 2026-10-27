@@ -8,10 +8,12 @@ window.TF_FIREBASE = {
   appId: "1:177460023352:web:4abb5ff6d51d6adb4496cd"
 };
 
+
 // Conectores en un clic: si pones aquí los Client ID públicos de TU app, los usuarios no tendrán que pegar nada.
 // Google no lo necesita si hay cuentas (Firebase): usa el inicio de sesión con Google.
 window.TF_CONNECT = {
   google: { clientId: "" },
   microsoft: { clientId: "" },
-  spotify: { clientId: "" }
+  spotify: { clientId: "8d2da8e3efa34e88a8234228af4661a7" }
 };
+
