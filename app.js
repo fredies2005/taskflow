@@ -622,7 +622,7 @@ function taskItem(t, i = 0, opts = {}) {
 }
 
 function emptyState() {
-  if (query) return { ic: "search", h: "Sin resultados", p: `No hay tareas que coincidan con “${query}”.` };
+  if (query) return { ic: "search", h: "Sin resultados", p: `No hay tareas que coincidan con “${esc(query)}”.` };
   const m = {
     today: { ic: "sparkle", h: "Todo al día", p: "No tienes tareas para hoy. Añade una arriba o planifica algo en el calendario." },
     upcoming: { ic: "clock", h: "Nada en el horizonte", p: "Las tareas con fecha futura aparecerán aquí." },
